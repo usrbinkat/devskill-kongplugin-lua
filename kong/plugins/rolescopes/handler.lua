@@ -35,9 +35,10 @@ function plugin:access(plugin_conf)
     kong.service.request.set_header("X-Account-Id", jsonResponse.role.accountId)
     kong.service.request.set_header("X-Party-Id", jsonResponse.role.partyId)
 
-    for i,scope in ipairs(jsonResponse.scopes) do
-      kong.service.request.add_header("X-Uplight-RoleScope", scope)
-    end
+    kong.log.debug("Uplight rolescopes plugin: " .. jsonResponse.scopes)
+    -- for i,scope in ipairs(jsonResponse.scopes) do
+    --   kong.service.request.add_header("X-Uplight-RoleScope", scope)
+    -- end
   end
 
 end
