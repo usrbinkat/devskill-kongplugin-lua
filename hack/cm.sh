@@ -1,2 +1,3 @@
 #!/bin/bash -x
-kubectl create configmap -nkong --from-file=kong/plugins/myplugin myplugin --dry-run=client -oyaml | kubectl apply -nkong -f -
+kubectl delete configmap -nkong rolescopes
+kubectl create configmap -nkong --from-file=kong/plugins/rolescopes rolescopes --dry-run=client -oyaml | kubectl apply -nkong -f -

@@ -12,6 +12,8 @@ This template was designed to work with the
 
 Please check out those repos `README` files for usage instructions.
 
+Helpful References:
+* [Kong Docs: Setting Up Custom Plugins](https://docs.konghq.com/kubernetes-ingress-controller/2.2.x/guides/setting-up-custom-plugins/)
 
 Naming and versioning conventions
 =================================

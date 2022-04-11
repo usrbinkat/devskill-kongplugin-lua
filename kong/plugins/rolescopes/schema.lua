@@ -3,6 +3,14 @@ local typedefs = require "kong.db.schema.typedefs"
 -- Grab pluginname from module name
 local plugin_name = ({...})[1]:match("^kong%.plugins%.([^%.]+)")
 
+--[[
+  GET 'https://platform.uplight.io/api/v1/bills' \
+  --header 'Authorization: Bearer MKWauvpcTyTizgkAs9ITE7wkemNA' \ <- from google
+  --header 'X-Uplight-Id: e8d6c0dc-713a-4e67-a74a-39b9ac5f4787'
+
+  GET 'https://digitalaccount.uplight.io/v1/roleScopes?uplightId=fe835f8c-843c-44a5-8abd-ad997585bb84' \
+--]]
+
 local schema = {
   name = plugin_name,
   fields = {
@@ -13,14 +21,18 @@ local schema = {
         -- The 'config' record is the custom part of the plugin schema
         type = "record",
         fields = {
-          -- a standard defined field (typedef), with some customizations
-          { request_header = typedefs.header_name {
-              required = true,
-              default = "Hello-World" } },
-          { response_header = typedefs.header_name {
-              required = true,
-              default = "Bye-World" } },
-          { ttl = { -- self defined field
+          -- uplight id
+          -- uplight token
+          -- client id
+          { uplight_id = {
+              type = "string",
+              required = false,
+              default = "X-Uplight-Id" } },
+          { role_scopes_endpoint = {
+              type = "string",
+              default = "https://digitalaccount.uplight.io/v1/roleScopes",
+              required = true, } },
+          { ttl = {
               type = "integer",
               default = 600,
               required = true,
