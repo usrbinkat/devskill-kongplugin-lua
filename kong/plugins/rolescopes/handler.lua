@@ -11,7 +11,7 @@ local plugin = {
 }
 
 function plugin:init_worker()
-  kong.log.debug("Uplight rolescopes plugin")
+  -- kong.log.debug("Uplight rolescopes plugin") -- idk why this was breaking plugin execution
 end
 
 function plugin:access(plugin_conf)
@@ -27,15 +27,16 @@ function plugin:access(plugin_conf)
   else
     kong.log.debug("Uplight id header detected, attempting rolescope lookup")
 
---[[
 
     local roleScopeResponse, err = httpc:request_uri(plugin_conf.role_scopes_endpoint, { method = "GET", query = string.format("uplightId=%s", idHeader) })
-    local jsonResponse = cjson.decode(roleScopeResponse)
+    kong.log.debug("Uplight rolescopes plugin: " .. roleScopeResponse)
+
+    -- local jsonResponse = cjson.decode(roleScopeResponse)
     -- kong.service.request.set_header("X-Account-Id", jsonResponse.role.accountId)
     -- kong.service.request.set_header("X-Party-Id", jsonResponse.role.partyId)
 
-    kong.log.debug("Uplight rolescopes plugin: " .. jsonResponse.scopes)
 
+--[[
     -- for i,scope in ipairs(jsonResponse.scopes) do
     --   kong.service.request.add_header("X-Uplight-RoleScope", scope)
     -- end
