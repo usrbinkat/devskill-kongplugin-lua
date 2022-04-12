@@ -1,7 +1,7 @@
 -- Import libraries
 local kong = kong
-local httpc = require "resty.http"
-local cjson = require "cjson"
+local http = require "resty.http"
+local cjson = require("cjson.safe").new()
 -- local sharedCache = ngx.shared.kong_dynamic_endpoint
 
 
@@ -27,9 +27,28 @@ function plugin:access(plugin_conf)
   else
     kong.log.debug("Uplight id header detected, attempting rolescope lookup")
 
+    -- construct request url
+    local url = plugin_conf.role_scopes_endpoint
+    kong.log.info("roleScopes URL:", url)
 
-    local roleScopeResponse, err = httpc:request_uri(plugin_conf.role_scopes_endpoint, { method = "GET", query = string.format("uplightId=%s", idHeader) })
-    kong.log.debug("Uplight rolescopes plugin: " .. roleScopeResponse)
+    -- query rolescopes endpoint
+    local httpc = http.new()
+    local roleScopeResponse, err = httpc:request_uri(url, {
+    method = "GET",
+    -- example body
+    -- body = what_you_are_sending,
+    -- headers = {
+    -- ["Content-Type"] = "application/x-www-form-urlencoded"
+    -- },
+    keepalive_timeout = 60,
+    keepalive_pool = 10,
+    --[[ ssl_verify should really be true ]]
+    ssl_verify= false
+    })
+
+    -- local roleScopeResponse, err = httpc:request_uri(url, { method = "GET", query = string.format("uplightId=%s", idHeader) })
+    local response = cjson.decode(roleScopeResponse)
+    kong.log.info("Uplight rolescopes plugin: ", response)
 
     -- local jsonResponse = cjson.decode(roleScopeResponse)
     -- kong.service.request.set_header("X-Account-Id", jsonResponse.role.accountId)
