@@ -78,15 +78,6 @@ function plugin:access(plugin_conf)
 end
 
 
---[[ runs in the 'body_filter_by_lua_block'
-function plugin:body_filter(plugin_conf)
-
-  -- your custom code here
-  kong.log.debug("saying hi from the 'body_filter' handler")
-
-end --]]
-
-
 --[[ runs in the 'log_by_lua_block'
 function plugin:log(plugin_conf)
 
