@@ -34,23 +34,36 @@ function plugin:access(plugin_conf)
     -- query rolescopes endpoint
     local httpc = http.new()
     local roleScopeResponse, err = httpc:request_uri(url, {
-    method = "GET",
+    method = "POST",
     -- example body
     -- body = what_you_are_sending,
-    -- headers = {
-    -- ["Content-Type"] = "application/x-www-form-urlencoded"
-    -- },
+    headers = {
+      ["Content-Type"] = "application/x-www-form-urlencoded"
+    },
     keepalive_timeout = 60,
     keepalive_pool = 10,
     --[[ ssl_verify should really be true ]]
     ssl_verify= false
     })
 
-    -- local roleScopeResponse, err = httpc:request_uri(url, { method = "GET", query = string.format("uplightId=%s", idHeader) })
-    local response = cjson.decode(roleScopeResponse)
-    kong.log.info("Uplight rolescopes plugin: ", response)
+    if (not roleScopeResponse) or err then
+      kong.log.err("Error querying rolescopes endpoint: ", err)
+      return kong.response.exit(500, { message = "Error querying rolescopes endpoint: " .. err })
+    else
+      local responseJson = cjson.encode(roleScopeResponse.body.role)
+      -- local roles = responseJson["role"]
+      -- local accountId = roles["accountId"]
+      -- kong.log.info("Role: ", roles, " Account ID: ", accountId)
 
-    -- local jsonResponse = cjson.decode(roleScopeResponse)
+      kong.log.info("Uplight rolescopes plugin: ", responseJson)
+
+      -- add scope to headers
+      local header = "X-Uplight-roleScopes"
+      -- kong.service.request.set_header(header, scope)
+      -- kong.log.info("Uplight rolescopes plugin: ", header, " set to: ", scope)
+
+    end
+
     -- kong.service.request.set_header("X-Account-Id", jsonResponse.role.accountId)
     -- kong.service.request.set_header("X-Party-Id", jsonResponse.role.partyId)
 
