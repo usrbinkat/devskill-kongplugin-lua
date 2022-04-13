@@ -45,17 +45,20 @@ function plugin:access(plugin_conf)
     --[[ ssl_verify should really be true ]]
     ssl_verify= false
     })
+    local responseJson = cjson.decode(roleScopeResponse.body)
+    kong.log.info("responseJson = ", cjson.encode(responseJson))
+    local scope = responseJson.scopes
+    local scopes = cjson.encode(scope)
+    kong.log.info("Uplight rolescopes plugin: ", scopes)
 
     if (not roleScopeResponse) or err then
       kong.log.err("Error querying rolescopes endpoint: ", err)
       return kong.response.exit(500, { message = "Error querying rolescopes endpoint: " .. err })
     else
-      local responseJson = cjson.encode(roleScopeResponse.body.role)
       -- local roles = responseJson["role"]
       -- local accountId = roles["accountId"]
       -- kong.log.info("Role: ", roles, " Account ID: ", accountId)
 
-      kong.log.info("Uplight rolescopes plugin: ", responseJson)
 
       -- add scope to headers
       local header = "X-Uplight-roleScopes"
