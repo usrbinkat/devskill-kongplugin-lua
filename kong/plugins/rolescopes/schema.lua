@@ -37,16 +37,24 @@ local schema = {
           {
             -- URL to query for rolescopes
             ssl_verify = {
+              default = false,
               type = "boolean",
               required = true,
-              default = false,
+            }
+          },
+          {
+            cache_size = {
+              default = 1000,
+              type = "integer",
+              required = true,
+              gt = 0, -- must be greater than 0
             }
           },
           {
             ttl = {
+              default = 2,
               type = "integer",
               required = true,
-              default = 600,
               gt = 0, -- must be greater than 0
             }
           },
