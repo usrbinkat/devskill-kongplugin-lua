@@ -1,5 +1,5 @@
+-- Inherit plugin name
 local typedefs = require "kong.db.schema.typedefs"
-
 local plugin_name = ({...})[1]:match("^kong%.plugins%.([^%.]+)")
 
 local schema = {
@@ -10,17 +10,36 @@ local schema = {
     { config = {
         type = "record",
         fields = {
+          -- Define configurable fields
           {
-            uplight_id = {
+            -- Header name to set the Uplight ID
+            client_id_header = {
               type = "string",
-              required = false,
               default = "X-Uplight-Id",
+              required = false,
             }
           },
           {
-            role_scopes_endpoint = {
+            -- Header name to add the rolescopes to
+            scopes_header = {
               type = "string",
+              default = "X-Uplight-roleScopes",
+              required = false,
+            }
+          },
+          {
+            -- URL to query for rolescopes
+            scopes_api = {
+              type = "string",
+              required = false,
+            }
+          },
+          {
+            -- URL to query for rolescopes
+            ssl_verify = {
+              type = "boolean",
               required = true,
+              default = false,
             }
           },
           {
@@ -32,12 +51,22 @@ local schema = {
             }
           },
         },
+        -- Declare sanity checks
         entity_checks = {
-          -- add some validation rules across fields
-          -- the following is silly because it is always true, since they are both required
-          { at_least_one_of = { "uplight_id", "role_scopes_endpoint" }, },
-          -- We specify that both header-names cannot be the same
-          { distinct = { "uplight_id", "role_scopes_endpoint"} },
+          {
+            -- Validate required fields are set
+            at_least_one_of = {
+              "client_id_header",
+              "scopes_header"
+            },
+          },
+          {
+            -- Validate header-names can not be the same
+            distinct = {
+              "client_id_header",
+              "scopes_header"
+            }
+          },
         },
       },
     },

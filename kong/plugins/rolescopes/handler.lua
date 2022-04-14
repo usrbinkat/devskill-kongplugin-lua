@@ -1,94 +1,77 @@
--- Import libraries
+local plugin = { PRIORITY = 1012, VERSION = "0.1", }        -- Set Plugin Version & Execution Priority
+
+-- Lua Imports
 local kong = kong
 local http = require "resty.http"
 local cjson = require("cjson.safe").new()
--- local sharedCache = ngx.shared.kong_dynamic_endpoint
-
-
-local plugin = {
-  PRIORITY = 1000, -- set the plugin priority, which determines plugin execution order
-  VERSION = "0.1", -- version in X.Y.Z format. Check hybrid-mode compatibility requirements.
-}
-
-function plugin:init_worker()
-  -- kong.log.debug("Uplight rolescopes plugin") -- idk why this was breaking plugin execution
-end
 
 function plugin:access(plugin_conf)
 
-  kong.log.inspect(plugin_conf)   -- check the logs for a pretty-printed config!
+  kong.log.inspect(plugin_conf)                             -- Load Plugin Configuration
 
-  -- assign uplight id header value to variable
-  local idHeader = kong.request.get_header(plugin_conf.uplight_id)
+  local httpc = http.new()                                  -- Set HTTP connection
+  local ssl_verify = plugin_conf.ssl_verify                 -- SSL Verification boolean
+  local scopes_api = plugin_conf.scopes_api                 -- Scopes API Endpoint variable
+  local scopes_header = plugin_conf.scopes_header           -- Scopes Header Name variable
+  local client_id_header = plugin_conf.client_id_header     -- ID Header name variable
 
-  -- if uplight_id header is present, request rolescopes and add scopes to headers
-  if not idHeader then
-    kong.log.debug("Uplight id header not found, exiting rolescope lookup")
-  else
-    kong.log.debug("Uplight id header detected, attempting rolescope lookup")
+  kong.log.debug("Scopes API URL: ", scopes_api)
 
-    -- construct request url
-    local url = plugin_conf.role_scopes_endpoint
-    kong.log.info("roleScopes URL:", url)
+  if not client_id_header then                              -- Allow request to continue if Client ID Header is not present
+    kong.log.debug("Id Header not detected .. skip rolescope query ..")
 
-    -- query rolescopes endpoint
-    local httpc = http.new()
-    local roleScopeResponse, err = httpc:request_uri(url, {
-    method = "POST",
-    -- example body
-    -- body = what_you_are_sending,
-    headers = {
-      ["Content-Type"] = "application/x-www-form-urlencoded"
-    },
-    keepalive_timeout = 60,
-    keepalive_pool = 10,
-    --[[ ssl_verify should really be true ]]
-    ssl_verify= false
-    })
-    local responseJson = cjson.decode(roleScopeResponse.body)
-    kong.log.info("responseJson = ", cjson.encode(responseJson))
-    local scope = responseJson.scopes
-    local scopes = cjson.encode(scope)
-    kong.log.info("Uplight rolescopes plugin: ", scopes)
-
-    if (not roleScopeResponse) or err then
-      kong.log.err("Error querying rolescopes endpoint: ", err)
-      return kong.response.exit(500, { message = "Error querying rolescopes endpoint: " .. err })
-    else
-      -- local roles = responseJson["role"]
-      -- local accountId = roles["accountId"]
-      -- kong.log.info("Role: ", roles, " Account ID: ", accountId)
-
-
-      -- add scope to headers
-      local header = "X-Uplight-roleScopes"
-      -- kong.service.request.set_header(header, scope)
-      -- kong.log.info("Uplight rolescopes plugin: ", header, " set to: ", scope)
+  else                                                      -- If Client ID Header is present, append rolescopes to headers
+    if client_id_header == nil then                         -- If ID Header is not set
+      kong.log.err("ERR 400 Client ID Header not set")      -- Log error
+      return kong.response.exit(400, {                      -- Return HTTP 400 Bad Request
+        message = "Client ID Header not set"
+      })
 
     end
 
-    -- kong.service.request.set_header("X-Account-Id", jsonResponse.role.accountId)
-    -- kong.service.request.set_header("X-Party-Id", jsonResponse.role.partyId)
+    local client_id = kong.request.get_header(              -- Set Client ID variable from Client ID Header
+      plugin_conf.client_id_header
+    )
 
+    kong.log.debug(
+      "Client ID Header: ", client_id_header, " - ",
+      "Client ID: ",        client_id
+    )
 
---[[
-    -- for i,scope in ipairs(jsonResponse.scopes) do
-    --   kong.service.request.add_header("X-Uplight-RoleScope", scope)
-    -- end
---]]
+    local res, err = httpc:request_uri(scopes_api, {        -- Request Scopes API
+      method = "POST",
+      ssl_verify = ssl_verify,
+      headers = {
+        ["Content-Type"] = "application/x-www-form-urlencoded",
+        [client_id_header] = client_id,                     -- Send Client ID to Scopes API
+      }
+    })
+
+    kong.log.debug("Scopes API Response Body: ", res.body)
+
+    -- Test if Scopes API request was successful
+    if (not res) or err then
+      kong.log.err("Scopes API Failure: ", err)             -- Return 500 if Scopes API request failed & log error
+      return kong.response.exit(500, { message = "Error calling Scopes API endpoint" })
+
+    else
+
+      local scopes = cjson.decode(res.body).scopes          -- Decode Scopes from JSON response
+
+      kong.log.debug(
+        "Client ID ", client_id, " - ",
+        "Scopes JSON: ", cjson.encode(scopes)
+      )
+
+      for i,scope in ipairs(scopes) do                      -- Append each scopee as a header
+        kong.service.request.add_header(scopes_header, scope)
+        kong.log.debug("Add Header: [", scopes_header, ": ", scope, "]")
+      end
+
+      kong.log.info(client_id_header, ": ", cjson.encode(kong.request.get_headers()))
+
+    end
   end
-
 end
 
-
---[[ runs in the 'log_by_lua_block'
-function plugin:log(plugin_conf)
-
-  -- your custom code here
-  kong.log.debug("saying hi from the 'log' handler")
-
-end --]]
-
-
--- return our plugin object
-return plugin
+return plugin                                               -- return our plugin object
