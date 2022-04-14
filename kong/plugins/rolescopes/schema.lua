@@ -16,7 +16,7 @@ local schema = {
             client_id_header = {
               type = "string",
               default = "X-Uplight-Id",
-              required = false,
+              required = true,
             }
           },
           {
@@ -24,14 +24,14 @@ local schema = {
             scopes_header = {
               type = "string",
               default = "X-Uplight-roleScopes",
-              required = false,
+              required = true,
             }
           },
           {
             -- URL to query for rolescopes
             scopes_api = {
               type = "string",
-              required = false,
+              required = true,
             }
           },
           {

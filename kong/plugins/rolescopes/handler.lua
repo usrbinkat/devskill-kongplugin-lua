@@ -4,6 +4,7 @@ local plugin = { PRIORITY = 1012, VERSION = "0.1", }        -- Set Plugin Versio
 local kong = kong
 local http = require "resty.http"
 local cjson = require("cjson.safe").new()
+local logDbg = kong.log.debug
 
 function plugin:access(plugin_conf)
 
@@ -15,10 +16,10 @@ function plugin:access(plugin_conf)
   local scopes_header = plugin_conf.scopes_header           -- Scopes Header Name variable
   local client_id_header = plugin_conf.client_id_header     -- ID Header name variable
 
-  kong.log.debug("Scopes API URL: ", scopes_api)
+  logDbg("Scopes API URL: ", scopes_api)
 
   if not client_id_header then                              -- Allow request to continue if Client ID Header is not present
-    kong.log.debug("Id Header not detected .. skip rolescope query ..")
+    logDbg("Id Header not detected .. skip rolescope query ..")
 
   else                                                      -- If Client ID Header is present, append rolescopes to headers
 
@@ -34,7 +35,7 @@ function plugin:access(plugin_conf)
 
     end
 
-    kong.log.debug(
+    logDbg(
       "Client ID Header: ", client_id_header, " - ",
       "Client ID: ",        client_id
     )
@@ -48,7 +49,7 @@ function plugin:access(plugin_conf)
       }
     })
 
-    kong.log.debug("Scopes API Response Body: ", res.body)
+    logDbg("Scopes API Response Body: ", res.body)
 
     -- Test if Scopes API request was successful
     if (not res) or err then
@@ -59,17 +60,17 @@ function plugin:access(plugin_conf)
 
       local scopes = cjson.decode(res.body).scopes          -- Decode Scopes from JSON response
 
-      kong.log.debug(
+      logDbg(
         "Client ID ", client_id, " - ",
         "Scopes JSON: ", cjson.encode(scopes)
       )
 
       for i,scope in ipairs(scopes) do                      -- Append each scopee as a header
         kong.service.request.add_header(scopes_header, scope)
-        kong.log.info(client_id, " [", scopes_header, ": ", scope, "]")
+        kong.log.info(client_id, "Add Scope: [", scopes_header, ": ", scope, "]")
       end
 
-      kong.log.debug(
+      logDbg(
         client_id, ": ", cjson.encode(kong.request.get_headers())
       )
 
