@@ -21,17 +21,18 @@ function plugin:access(plugin_conf)
     kong.log.debug("Id Header not detected .. skip rolescope query ..")
 
   else                                                      -- If Client ID Header is present, append rolescopes to headers
-    if client_id_header == nil then                         -- If ID Header is not set
+
+    local client_id = kong.request.get_header(              -- Set Client ID variable from Client ID Header
+      plugin_conf.client_id_header
+    )
+
+    if client_id == nil then                                -- If ID Header is not set
       kong.log.err("ERR 400 Client ID Header not set")      -- Log error
       return kong.response.exit(400, {                      -- Return HTTP 400 Bad Request
         message = "Client ID Header not set"
       })
 
     end
-
-    local client_id = kong.request.get_header(              -- Set Client ID variable from Client ID Header
-      plugin_conf.client_id_header
-    )
 
     kong.log.debug(
       "Client ID Header: ", client_id_header, " - ",
@@ -65,10 +66,12 @@ function plugin:access(plugin_conf)
 
       for i,scope in ipairs(scopes) do                      -- Append each scopee as a header
         kong.service.request.add_header(scopes_header, scope)
-        kong.log.debug("Add Header: [", scopes_header, ": ", scope, "]")
+        kong.log.info(client_id, " [", scopes_header, ": ", scope, "]")
       end
 
-      kong.log.info(client_id_header, ": ", cjson.encode(kong.request.get_headers()))
+      kong.log.debug(
+        client_id, ": ", cjson.encode(kong.request.get_headers())
+      )
 
     end
   end
