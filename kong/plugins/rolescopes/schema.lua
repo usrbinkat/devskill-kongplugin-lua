@@ -52,7 +52,7 @@ local schema = {
           },
           {
             ttl = {
-              default = 2,
+              default = 600,
               type = "integer",
               required = true,
               gt = 0, -- must be greater than 0
