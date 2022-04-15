@@ -1,4 +1,36 @@
-local plugin = { PRIORITY = 1012, VERSION = "0.1", }               -- Set Plugin Version & Execution Priority
+--[[
+  This plugin is designed to augment IDP provided role scopes via secondary scopes api service
+  to append acquired additional scopes to the request *if* a specified header is populated with a Client ID.
+
+  Generically, the logic follows thus:
+    - If the named header is not present and populated then ignore and allow request to proceed normally
+    - If the named header is present with a Client ID value, then obtain and append the additional scopes as headers
+      - First query local cache for cached results
+      - Second, if cache query is a miss than proceed to query scopes provider api
+        - If the scopes api returns an error then return the error to the client
+        - If the scopes api returns an error than return 500 to the client
+        - If the scopes api returns scopes successfully then:
+          - Cache the scope results by Client ID with the configured ttl value
+          - Return the scopes to the next handler
+      - Finally, append the additional scopes to the request as additional headers
+
+  Logging includes the following logs per log level:
+    INFO:
+      - when a Cache hit occurs
+      - when a Cache miss occurs
+      - when scopes are added to a request
+      - when a 500 is returned to the client
+    DEBUG:
+      - Scopes JSON
+      - Scopes API URL
+      - Cache hit return data
+      - Scopes api response body
+      - Log when no Client ID is found
+      - All headers after plugin is run
+      - Client ID Header key name and value
+--]]
+
+local plugin = { PRIORITY = 1012, VERSION = "1.0", }               -- Set Plugin Version & Execution Priority
 
 -- Lua Imports
 local kong     = kong
@@ -11,6 +43,9 @@ local logINFO = kong.log.info
 local logDBG  = kong.log.debug
 local logERR  = kong.log.err
 local scopes
+-- Set Error Messages
+local error_msg_400 = "400 ERROR Client ID Header sent with nil value!"
+local error_msg_500 = "500 ERROR Failure calling Scopes API!"
 
 -- Initialize Local Cache
 local lru, err = lrucache.new(1000)                                -- Set Cache
@@ -18,8 +53,7 @@ if not lru or err then                                             -- Abort if C
   logERR("Cache initialization error! " .. (err or "unknown"))
 end
 
-function plugin:access(plugin_conf)
-
+function plugin:access(plugin_conf)                                -- Core Function
   -- Plugin Configuration Variables
   local ttl              = plugin_conf.ttl                         -- Cache TTL in seconds
   local ssl_verify       = plugin_conf.ssl_verify                  -- SSL Verification boolean
@@ -27,13 +61,8 @@ function plugin:access(plugin_conf)
   local scopes_header    = plugin_conf.scopes_header               -- Scopes Header Name variable
   local client_id_header = plugin_conf.client_id_header            -- ID Header name variable
 
-  -- Set Error Messages
-  local error_msg_400 = "400 ERROR Client ID Header sent with nil value!"
-  local error_msg_500 = "500 ERROR Failure calling Scopes API!"
-
   -- Scopes API Query Function
   local function get_scopes(client_id)
-    logDBG("Scopes API URL: ", scopes_api)
     local httpc    = http.new()                                    -- Set HTTP connection
     local res, err = httpc:request_uri(scopes_api, {               -- Request Scopes API
       method = "POST",
@@ -57,12 +86,9 @@ function plugin:access(plugin_conf)
     plugin_conf.client_id_header
   )
 
-  if client_id_header and client_id == nil then                    -- Test if ID Header is sent with NILL value
-    logERR(error_msg_400)                                          -- Log Error
-    return kong.response.exit(400, { message = error_msg_400 })    -- Return HTTP 400 Bad Request
-  end
-
-  if client_id_header then                                         -- Append scopes to headers if Client ID Header present
+  if (client_id == nil) then                                       -- Append scopes to headers if Client ID Header present
+    logDBG("No Client ID Found")
+  else
     logDBG(client_id_header, ": ", client_id)
 
     local cache_hit = lru:get(client_id)                           -- Search for Client ID in Cache
@@ -70,33 +96,29 @@ function plugin:access(plugin_conf)
       logINFO("Cache Hit: ", client_id)                            -- Log Cache Hit
       logDBG(                                                      -- Debug Log: Client ID, Scopes, Headers
         "Cache Data: ",
-        client_id,
+        client_id, " ",
         cjson.encode(cache_hit)
       )
-      -- TODO: append cached scopes to headers
     else
       logINFO("Cache Miss: ", client_id)                           -- Log cache miss for Client ID
       local scope_res = get_scopes(client_id)                      -- If cache miss, query Scopes API
       if scope_res then
         lru:set(client_id, scope_res, ttl)
       end
-      for i,scope in ipairs(scope_res) do                          -- Append each scopee as a header
-        kong.service.request.add_header(scopes_header, scope)
-        logINFO(client_id,
-          " add scope: [", scopes_header, ": ", scope, "]"
-        )
-      end
     end
-  else                                                             -- Allow request to continue if Client ID Header is not present
-    logDBG("Id Header not detected. Skip rolescope query.")
+
+    -- Add scopes to headers
+    for i,scope in ipairs(scopes) do                               -- Append each scopee as a header
+      kong.service.request.add_header(scopes_header, scope)
+      logINFO(client_id,
+        " add scope: [", scopes_header, ": ", scope, "]"
+      )
+    end
+
+    logDBG("Scopes API URL: ", scopes_api)
+    logDBG("Scopes JSON: ", cjson.encode(scopes))
+    logDBG("All Headers: ", client_id, ": ", cjson.encode(kong.request.get_headers()))
   end
-  logDBG(
-    "Client ID ", client_id, " - ",
-    "Scopes JSON: ", cjson.encode(scopes),
-    "All Headers: ", client_id, ": ", cjson.encode(
-      kong.request.get_headers()
-    )
-  )
 end
 
-return plugin                                                      -- return our plugin object
+return plugin
